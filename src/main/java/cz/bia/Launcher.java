@@ -23,9 +23,6 @@ import org.jzy3d.plot3d.rendering.canvas.Quality;
 
 import java.awt.*;
 import java.lang.reflect.InvocationTargetException;
-import java.util.Optional;
-import java.util.Random;
-import java.util.concurrent.TimeUnit;
 
 public class Launcher extends JFrame {
     IFunction[] funs = {new FirstYao(), new SecondYao(), new ThirdYao(), new FourthYao(), new FifthYao(), new SixthYao(), new SeventhYao(), new EighthYao(), new NinthYao(), new TenthYao(),
@@ -34,31 +31,32 @@ public class Launcher extends JFrame {
 
     String[] funsToMenu = {"1 Yao", "2 Yao", "3 Yao", "4 Yao", "5 Yao", "6 Yao", "7 Yao", "8 Yao", "9 Yao", "10 Yao", "11 Yao", "12 Yao", "13 Yao", "14 Yao NI",
             "15 Yao NI", "16 Yao", "17 Yao", "18 Yao", "19 Yao NI", "20 Yao NI", "21 Yao NI"};
-
+    String[] algToMenu = {"Blind algorithm", "Simulated annealing", "Differential evolution", "SOMA" };
 
     private Chart chart;
     private final JPanel northPanel;
     private final JPanel centerPanel;
     private JComboBox functions;
+    private JComboBox algorithms;
     private ChartScene scene;
     private Shape surface;
     private TextField popField;
     private TextField rangeFromText;
     private TextField rangeToText;
     private JCheckBox genMinimum;
-    private Random rand = new Random();
     private int popMax;
     private int popGenerations;
     private float minRange;
     private float maxRange;
     private JButton drawIt;
-    private JButton resetRange;
+    private JButton resetGraph;
     private int steps;
     private Mapper mapper;
     private Range range;
     private TextField popCountField;
 
     private Population population;
+    private Thread thread;
 
     public static void main(String[] args) throws Exception {
         Launcher frame = new Launcher();
@@ -76,7 +74,7 @@ public class Launcher extends JFrame {
         this.add(centerPanel, BorderLayout.CENTER);
         this.setNorthPanel();
         this.setCenterPanel();
-        this.resetRangeInput();
+        this.resetChart();
         this.population = new Population();
     }
 
@@ -118,34 +116,66 @@ public class Launcher extends JFrame {
 
     private void startGeneration() {
         if (popGenerations > 0) {
-            Thread thread = new Thread(() -> {
+            this.enableSettings(false);
+            thread = new Thread(() -> {
                 for (int i = 0; i < popGenerations; i++) {
                     System.out.println(i + ". GENERATION");
                     if (popMax > 0) {
                         this.population.randomPopulation(minRange, maxRange, popMax, this.getSelectedFunction());
                         try {
                             Thread.sleep(1000);
-                            Coord3d best = this.population.getBest();
                             SwingUtilities.invokeAndWait(() -> {
-                                if (genMinimum.isSelected()) {
-                                    drawPoint(best);
-                                }
-                                this.drawPopulation();
+                                this.selectAlgorithm();
                             });
                         } catch (InterruptedException | InvocationTargetException e) {
                             e.printStackTrace();
                         }
                     }
                 }
+                this.enableSettings(true);
             });
             thread.start();
         }
     }
 
-    private void drawPopulation() {
+    private void enableSettings(boolean b) {
+        algorithms.setEnabled(b);
+        functions.setEnabled(b);
+        popField.setEnabled(b);
+        popCountField.setEnabled(b);
+        rangeFromText.setEnabled(b);
+        rangeToText.setEnabled(b);
+    }
+
+    private void selectAlgorithm() {
+        int selectedAlg = algorithms.getSelectedIndex();
+        boolean diff = false;
+        switch (selectedAlg) {
+            case 0:
+                Coord3d best = this.population.getBest();
+                drawPoint(best);
+                break;
+            case 1:
+                diff = true;
+                break;
+            case 2:
+                break;
+            case 3:
+                break;
+
+        }
+        this.drawPopulation(diff);
+    }
+
+    private void drawPopulation(boolean diff) {
+        Scatter scatter;
         System.out.println("Adding scatter.");
         chart = AWTChartComponentFactory.chart(Quality.Advanced, "newt");
-        Scatter scatter = new Scatter(population.getPopulation(), Color.BLACK, 4);
+        if(diff) {
+           scatter = new Scatter(population.getFor(this.getSelectedFunction()), Color.CYAN, 4);
+        }
+        else
+            scatter = new Scatter(population.getPopulation(), Color.CYAN, 4);
         chart.getScene().add(scatter);
         surface.add(scatter);
     }
@@ -156,7 +186,7 @@ public class Launcher extends JFrame {
         System.out.println("Adding minimum.");
         Coord3d[] oneM = new Coord3d[1];
         oneM[0] = point;
-        Scatter minimum = new Scatter(oneM, Color.YELLOW, 25);
+        Scatter minimum = new Scatter(oneM, Color.BLACK, 10.5f);
         surface.remove(minimum);
         chart.getScene().remove(minimum);
         repaintSurface();
@@ -207,13 +237,16 @@ public class Launcher extends JFrame {
         JLabel rangeToLabel = new JLabel("To:");
         rangeFromText = new TextField(String.valueOf(minRange));
         rangeToText = new TextField(String.valueOf(maxRange));
-        resetRange = new JButton("R");
-        resetRange.addActionListener(e -> resetChart());
+        resetGraph = new JButton("R");
+        resetGraph.addActionListener(e -> resetChart());
         genMinimum = new JCheckBox("Min", false);
         functions = new JComboBox(funsToMenu);
         functions.setForeground(java.awt.Color.gray);
         functions.setFont(new Font("Arial", Font.PLAIN, 14));
         functions.setMaximumRowCount(21);
+        algorithms = new JComboBox(algToMenu);
+        algorithms.setForeground(java.awt.Color.gray);
+        algorithms.setFont(new Font("Arial", Font.PLAIN, 14));
         drawIt = new JButton("Draw it");
         drawIt.addActionListener(e -> {
             invalidateCanvas();
@@ -225,8 +258,9 @@ public class Launcher extends JFrame {
         popCountField = new TextField("0");
         //this.northPanel.add(Box.createRigidArea(new Dimension(45, 0)));
         this.northPanel.add(functions);
+        this.northPanel.add(algorithms);
         this.northPanel.add(drawIt);
-        this.northPanel.add(genMinimum);
+       // this.northPanel.add(genMinimum);
         this.northPanel.add(popLabel);
         this.northPanel.add(popField);
         this.northPanel.add(popCountLabel);
@@ -239,17 +273,17 @@ public class Launcher extends JFrame {
         this.northPanel.add(rangeToLabel);
         this.northPanel.add(Box.createRigidArea(new Dimension(4, 0)));
         this.northPanel.add(rangeToText);
-        this.northPanel.add(resetRange);
+        this.northPanel.add(resetGraph);
 
     }
 
     private void resetChart() {
-        resetRangeInput();
-    }
-
-    private void resetRangeInput() {
         rangeFromText.setText(String.valueOf(funs[functions.getSelectedIndex()].getMinRange()));
         rangeToText.setText(String.valueOf(funs[functions.getSelectedIndex()].getMaxRange()));
+        if(thread != null){
+            thread.stop();
+        }
+        this.enableSettings(true);
     }
 
 }
