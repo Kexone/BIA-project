@@ -31,7 +31,7 @@ public class Launcher extends JFrame {
 
     String[] funsToMenu = {"1 Yao", "2 Yao", "3 Yao", "4 Yao", "5 Yao", "6 Yao", "7 Yao", "8 Yao", "9 Yao", "10 Yao", "11 Yao", "12 Yao", "13 Yao", "14 Yao NI",
             "15 Yao NI", "16 Yao", "17 Yao", "18 Yao", "19 Yao NI", "20 Yao NI", "21 Yao NI"};
-    String[] algToMenu = {"Blind algorithm", "Simulated annealing", "Differential evolution", "SOMA" };
+    String[] algToMenu = {"", "Blind algorithm", "Simulated annealing", "Differential evolution", "SOMA" };
 
     private Chart chart;
     private final JPanel northPanel;
@@ -43,7 +43,7 @@ public class Launcher extends JFrame {
     private TextField popField;
     private TextField rangeFromText;
     private TextField rangeToText;
-    private JCheckBox genMinimum;
+    private JCheckBox discrete;
     private int popMax;
     private int popGenerations;
     private float minRange;
@@ -64,10 +64,9 @@ public class Launcher extends JFrame {
     }
 
     public Launcher() {
-
         this.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         this.setContentPane(new JPanel(new BorderLayout()));
-        setSize(650, 600);
+        setSize(750, 600);
         northPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
         this.add(northPanel, BorderLayout.BEFORE_FIRST_LINE);
         centerPanel = new JPanel(new BorderLayout());
@@ -121,7 +120,7 @@ public class Launcher extends JFrame {
                 for (int i = 0; i < popGenerations; i++) {
                     System.out.println(i + ". GENERATION");
                     if (popMax > 0) {
-                        this.population.randomPopulation(minRange, maxRange, popMax, this.getSelectedFunction());
+                        this.population.randomPopulation(minRange, maxRange, popMax,this.discrete.isSelected(), this.getSelectedFunction());
                         try {
                             Thread.sleep(1000);
                             SwingUtilities.invokeAndWait(() -> {
@@ -141,6 +140,7 @@ public class Launcher extends JFrame {
     private void enableSettings(boolean b) {
         algorithms.setEnabled(b);
         functions.setEnabled(b);
+        discrete.setEnabled(b);
         popField.setEnabled(b);
         popCountField.setEnabled(b);
         rangeFromText.setEnabled(b);
@@ -152,15 +152,21 @@ public class Launcher extends JFrame {
         boolean diff = false;
         switch (selectedAlg) {
             case 0:
+                break;
+            case 1:
                 Coord3d best = this.population.getBest();
                 drawPoint(best);
                 break;
-            case 1:
+            case 2:
                 diff = true;
                 break;
-            case 2:
-                break;
             case 3:
+                Coord3d annealing = this.population.annealing();
+                drawPoint(annealing);
+                break;
+            case 4:
+                Coord3d soma = this.population.soma();
+                drawPoint(soma);
                 break;
 
         }
@@ -172,7 +178,7 @@ public class Launcher extends JFrame {
         System.out.println("Adding scatter.");
         chart = AWTChartComponentFactory.chart(Quality.Advanced, "newt");
         if(diff) {
-           scatter = new Scatter(population.getFor(this.getSelectedFunction()), Color.CYAN, 4);
+           scatter = new Scatter(population.getFor(this.discrete.isSelected(), this.getSelectedFunction()), Color.CYAN, 4);
         }
         else
             scatter = new Scatter(population.getPopulation(), Color.CYAN, 4);
@@ -239,7 +245,7 @@ public class Launcher extends JFrame {
         rangeToText = new TextField(String.valueOf(maxRange));
         resetGraph = new JButton("R");
         resetGraph.addActionListener(e -> resetChart());
-        genMinimum = new JCheckBox("Min", false);
+        discrete = new JCheckBox("Discrete", false);
         functions = new JComboBox(funsToMenu);
         functions.setForeground(java.awt.Color.gray);
         functions.setFont(new Font("Arial", Font.PLAIN, 14));
@@ -260,7 +266,7 @@ public class Launcher extends JFrame {
         this.northPanel.add(functions);
         this.northPanel.add(algorithms);
         this.northPanel.add(drawIt);
-       // this.northPanel.add(genMinimum);
+        this.northPanel.add(discrete);
         this.northPanel.add(popLabel);
         this.northPanel.add(popField);
         this.northPanel.add(popCountLabel);

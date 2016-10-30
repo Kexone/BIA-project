@@ -16,7 +16,7 @@ public class Population {
     private final double CR = 0.9;
     private double min;
     private double max;
-    public void randomPopulation(double min, double max, int countPopulation, IFunction function) {
+    public void randomPopulation(double min, double max, int countPopulation,boolean discrete, IFunction function) {
         this.min = min;
         this.max = max;
         this.population = new Coord3d[countPopulation];
@@ -25,7 +25,11 @@ public class Population {
                 double x = (max - min) * rand.nextDouble() + min ;
                 double y = (max - min) * rand.nextDouble() + min ;
                 double z = function.calculate(new double[]{x, y});
-                population[i] = new Coord3d(x, y, z);
+                if(discrete) {
+                    population[i] = new Coord3d((int)x, (int)y, (int)z);
+                }
+                else
+                    population[i] = new Coord3d(x, y, z);
             }
         }
 
@@ -37,7 +41,7 @@ public class Population {
         return Arrays.stream(this.population).min(Comparator.comparing(c -> c.z)).orElseThrow(() -> new RuntimeException("there is no best"));
     }
 
-    public Coord3d[] getFor(IFunction function) {
+    public Coord3d[] getFor(boolean discrete, IFunction function) {
         Coord3d[] newPopulation = new Coord3d[population.length];
         Coord3d noise = new Coord3d();
         for (int i = 0; i < population.length; i++) {
@@ -48,27 +52,39 @@ public class Population {
 
                 double random = rand.nextDouble();
                 if(random < CR) {
-                    newPopulation[i].x = noise.x;
+                    newPopulation[i].x = discrete ? (int) noise.x : noise.x;
                 }
                 else if( random >= CR) {
-                    newPopulation[i].x = population[i].x;
+                    newPopulation[i].x = discrete ? (int) population[i].x : population[i].x;
                 }
                 random = rand.nextDouble();
                 if(random < CR) {
-                    newPopulation[i].y = noise.y;
+                    newPopulation[i].y = discrete ? (int) noise.y : noise.y;
                 }
                 else if( random >= CR) {
-                    newPopulation[i].y = population[i].y;
+                    newPopulation[i].y = discrete ? (int) population[i].y : population[i].y;
                 }
-
-            newPopulation[i].z = (float) function.calculate(new double[]{newPopulation[i].x, newPopulation[i].y});
+            if(discrete) {
+                newPopulation[i].z = (int) function.calculate(new double[]{newPopulation[i].x, newPopulation[i].y});
+            }
+            else {
+                newPopulation[i].z = (float) function.calculate(new double[]{newPopulation[i].x, newPopulation[i].y});
+            }
             if(newPopulation[i].x < min || newPopulation[i].x > max || newPopulation[i].y < min || newPopulation[i].y > max ) {
                 i--;
                 continue;
             }
-            System.out.println("Old X:" + population[i].x +" Y:" +population[i].y +" Z:" +population[i].z );
-            System.out.println("New X:" + newPopulation[i].x +" Y:" +newPopulation[i].y +" Z:" +newPopulation[i].z );
+          //  System.out.println("Old X:" + population[i].x +" Y:" +population[i].y +" Z:" +population[i].z );
+          //  System.out.println("New X:" + newPopulation[i].x +" Y:" +newPopulation[i].y +" Z:" +newPopulation[i].z );
         }
     return newPopulation;
+    }
+
+    public Coord3d annealing(){
+        return Arrays.stream(this.population).min(Comparator.comparing(c -> c.z)).orElseThrow(() -> new RuntimeException("there is no best"));
+    }
+
+    public Coord3d soma(){
+        return Arrays.stream(this.population).min(Comparator.comparing(c -> c.z)).orElseThrow(() -> new RuntimeException("there is no best"));
     }
 }
