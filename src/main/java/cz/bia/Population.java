@@ -74,8 +74,6 @@ public class Population {
                 i--;
                 continue;
             }
-          //  System.out.println("Old X:" + population[i].x +" Y:" +population[i].y +" Z:" +population[i].z );
-          //  System.out.println("New X:" + newPopulation[i].x +" Y:" +newPopulation[i].y +" Z:" +newPopulation[i].z );
         }
     return newPopulation;
     }
