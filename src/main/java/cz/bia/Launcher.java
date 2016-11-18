@@ -59,15 +59,20 @@ public class Launcher extends JFrame {
     private Population population;
     private Thread thread;
     private int temperatureNow;
-    private TextField temperatureNowField;
+    private TextField temperatureNowFField;
     private TextField temperatureAfterField;
     private int temperatureAfter;
-    private TextField radiusField;
+    private TextField radiusCRField;
     private int radius;
     private JLabel theBestOfBest;
     private Coord3d best;
     private boolean generateNewPopulation = true;
     private boolean diff;
+    private JLabel radiusCRText;
+    private JLabel finalTemperatureFText;
+    private float crRadius;
+    private float fOrFinalTemp;
+    private float temperature;
 
     public static void main(String[] args) throws Exception {
         Launcher frame = new Launcher();
@@ -90,7 +95,6 @@ public class Launcher extends JFrame {
         this.setNorthPanel();
         this.setCenterPanel();
         this.resetChart();
-        this.population = new Population();
     }
 
 
@@ -99,10 +103,13 @@ public class Launcher extends JFrame {
         return funs[functions.getSelectedIndex()];
     }
 
-    private void invalidateCanvas() {
+    private void setBoundsAlgoritmData() {
         try {
-            minRange = (float) Float.parseFloat(rangeFromText.getText());
-            maxRange = (float) Float.parseFloat(rangeToText.getText());
+            minRange = Float.parseFloat(rangeFromText.getText());
+            maxRange = Float.parseFloat(rangeToText.getText());
+            crRadius = Float.parseFloat(radiusCRField.getText());
+            fOrFinalTemp = Float.parseFloat(temperatureNowFField.getText());
+            temperature = Float.parseFloat(temperatureAfterField.getText());
             if (Integer.parseInt(popField.getText()) > 0) {
                 popMax = Integer.parseInt(popField.getText());
                 popGenerations = Integer.parseInt(popCountField.getText());
@@ -111,10 +118,16 @@ public class Launcher extends JFrame {
             }
         } catch (Exception e) {
             popGenerations = 0;
+            crRadius = 0.5f;
+            fOrFinalTemp = 0.5f;
+            temperature = 0;
             System.out.println("Error NaN! " + e);
             minRange = (float) funs[functions.getSelectedIndex()].getMinRange();
             maxRange = (float) funs[functions.getSelectedIndex()].getMaxRange();
         }
+    }
+
+    private void invalidateCanvas() {
         range = new Range(minRange, maxRange);
         steps = 50;
         mapper = new Mapper() {
@@ -139,7 +152,7 @@ public class Launcher extends JFrame {
                     System.out.println(i + ". GENERATION");
                     if (popMax > 0) {
                         if(generateNewPopulation) {
-                            this.population.randomPopulation(minRange, maxRange, popMax,this.discrete.isSelected(), this.getSelectedFunction());
+                            this.population.randomPopulation(popMax);
                         }
                         this.selectAlgorithm();
                         try {
@@ -151,6 +164,13 @@ public class Launcher extends JFrame {
                             });
                         } catch (InterruptedException | InvocationTargetException e) {
                             e.printStackTrace();
+                        }
+                    }
+                    if(algorithms.getSelectedIndex() == 2) {
+                        if (population.isCompleted()) {
+                            break;
+                        } else {
+                            i--;
                         }
                     }
                 }
@@ -170,16 +190,19 @@ public class Launcher extends JFrame {
         popCountField.setEnabled(b);
         rangeFromText.setEnabled(b);
         rangeToText.setEnabled(b);
+        radiusCRField.setEnabled(b);
+        temperatureAfterField.setEnabled(b);
+        temperatureNowFField.setEnabled(b);
     }
 
     private void selectAlgorithm() {
         int selectedAlg = algorithms.getSelectedIndex();
         diff = false;
         switch (selectedAlg) {
-            case 0:
+            case 0:             // Without algorithm
                 this.drawPopulation(diff);
                 break;
-            case 1:
+            case 1:             // Blind search
                 if(best == null) {
                     best = this.population.getBest(this.population.getPopulation());
                 }
@@ -188,18 +211,24 @@ public class Launcher extends JFrame {
                 theBestOfBest.setText("The best is X:" + best.x + " Y:" + best.y + " Z:" + best.z);
                // drawPoint(best);
                 break;
-            case 2:
+            case 2:             // Simulation Annealing
+                generateNewPopulation = false;
+                if(best == null) {
+                    best =  population.generateInvidual();
+                    System.out.println("NEW X:" + best.x + " Y:" + best.y + " Z:" + best.z);
 
-                isBest(this.best);
-             //   best = this.population.getBest(this.population.getPopulation());
-                Coord3d annealing = this.population.annealing(minRange, maxRange, popMax,this.discrete.isSelected(), this.getSelectedFunction());
+                }
+                //isBest(this.best);
+                best = this.population.annealing(popMax, best);
+               // Coord3d annealing = this.population.annealing(popMax);
+                System.out.println("BEST X:" + best.x + " Y:" + best.y + " Z:" + best.z);
                 theBestOfBest.setText("The best is X:" + best.x + " Y:" + best.y + " Z:" + best.z);
-                drawPoint(annealing);
+            //     drawPoint(best);
                 break;
-            case 3:
+            case 3:             // Differencial evolution
                 generateNewPopulation = false;
                 diff = true;
-                this.population.differencial(this.discrete.isSelected(), this.getSelectedFunction());
+                this.population.differencial();
                 if(best == null) {
                     best = this.population.getBest(this.population.getMutation());
                 }
@@ -211,7 +240,7 @@ public class Launcher extends JFrame {
                 theBestOfBest.setText("The best is X:" + best.x + " Y:" + best.y + " Z:" + best.z);
 //                drawPoint(best);
                 break;
-            case 4:
+            case 4:             // SOMA
                 Coord3d soma = this.population.soma();
                 drawPoint(soma);
                 break;
@@ -248,7 +277,7 @@ public class Launcher extends JFrame {
             surface.add(mutation);
         }
         else {
-            scatter = new Scatter(population.getPopulation(), Color.CYAN, 4);
+            scatter = new Scatter(population.getPopulation(), Color.GREEN, 4);
             chart.getScene().add(scatter);
             surface.add(scatter);
         }
@@ -321,6 +350,8 @@ public class Launcher extends JFrame {
         algorithms.setFont(new Font("Arial", Font.PLAIN, 14));
         drawIt = new JButton("Draw it");
         drawIt.addActionListener(e -> {
+            setBoundsAlgoritmData();
+            this.population = new Population(minRange,maxRange, fOrFinalTemp, crRadius, temperature, this.discrete.isSelected(), this.getSelectedFunction());
             invalidateCanvas();
             startGeneration();
         });
@@ -329,18 +360,20 @@ public class Launcher extends JFrame {
         JLabel rangeToLabel = new JLabel("To:");
         JLabel speedLabel = new JLabel("Speed:");
         JLabel algorithmText = new JLabel("Algorithm:");
+        finalTemperatureFText = new JLabel("Final temp:");
         JLabel temperatureNowText = new JLabel("Temperature:");
-        JLabel temperatureAfterText = new JLabel("Final temp:");
-        JLabel radiusText = new JLabel("Radius:");
+        radiusCRText = new JLabel("Radius:");
         theBestOfBest = new JLabel("The best is...");
         rangeFromText = new TextField(String.valueOf(minRange));
         rangeToText = new TextField(String.valueOf(maxRange));
-        radiusField = new TextField(String.valueOf(radius));
-        temperatureNowField = new TextField(String.valueOf(temperatureNow));
+        radiusCRField = new TextField(String.valueOf(radius));
+        temperatureNowFField = new TextField(String.valueOf(temperatureNow));
         temperatureAfterField = new TextField(String.valueOf(temperatureAfter));
-        temperatureNowField.setEnabled(false);
+        temperatureNowFField.setEnabled(false);
         temperatureAfterField.setEnabled(false);
-        radiusField.setEnabled(false);
+        radiusCRField.setEnabled(false);
+
+
         speedSlider = new JSlider(0,3000, 1000);
         speedSlider.setMajorTickSpacing(1000);
         speedSlider.setMinorTickSpacing(100);
@@ -352,11 +385,11 @@ public class Launcher extends JFrame {
         this.northPanel.add(drawIt);
         this.northPanel.add(discrete);
         this.northPanel.add(populationPanel);
-        this.northPanel.add(radiusText);
-        this.northPanel.add(radiusField);
+        this.northPanel.add(radiusCRText);
+        this.northPanel.add(radiusCRField);
+        this.northPanel.add(finalTemperatureFText);
+        this.northPanel.add(temperatureNowFField);
         this.northPanel.add(temperatureNowText);
-        this.northPanel.add(temperatureNowField);
-        this.northPanel.add(temperatureAfterText);
         this.northPanel.add(temperatureAfterField);
         this.northPanel.add(Box.createRigidArea(new Dimension(65, 0)));
         this.northPanel.add(speedLabel);
@@ -377,15 +410,26 @@ public class Launcher extends JFrame {
 
     private void enableAdditionalFields() {
         if( algorithms.getSelectedIndex() == 2) {
-            temperatureNowField.setEnabled(true);
+            radiusCRText.setText("Radius:");
+            finalTemperatureFText.setText("Final temp:");
+            temperatureNowFField.setEnabled(true);
             temperatureAfterField.setEnabled(true);
-            radiusField.setEnabled(true);
+            radiusCRField.setEnabled(true);
 
         }
-        else {
-            temperatureNowField.setEnabled(false);
+        else if( algorithms.getSelectedIndex() == 3) {
+            temperatureNowFField.setEnabled(true);
             temperatureAfterField.setEnabled(false);
-            radiusField.setEnabled(false);
+            radiusCRField.setEnabled(true);
+            radiusCRText.setText("CR:");
+            finalTemperatureFText.setText("F:");
+            temperatureNowFField.setText("0.5");
+            radiusCRField.setText("0.5");
+        }
+        else {
+            temperatureNowFField.setEnabled(false);
+            temperatureAfterField.setEnabled(false);
+            radiusCRField.setEnabled(false);
 
         }
     }
