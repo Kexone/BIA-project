@@ -4,6 +4,7 @@ package cz.bia;
 import cz.bia.model.IFunction;
 import org.jzy3d.maths.Coord3d;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.Random;
@@ -16,11 +17,15 @@ public class Population {
     private final double crOrRadius;
     private double temperature;
     private final double beta = 0.3;
-    private double min;
-    private double max;
+    private final double min;
+    private final double max;
     private boolean discrete;
     private IFunction function;
     private Coord3d[] newPopulation;
+    private final double  step = 0.1;
+    private final double pathLength = 3.0;
+    private final double PRT = 0.3;
+
 
     public Population(double min, double max,double F, double CR, double temp, boolean discrete, IFunction function) {
         this.min = min;
@@ -58,6 +63,10 @@ public class Population {
 
     public Coord3d getBest(Coord3d[] pop){
         return Arrays.stream(pop).min(Comparator.comparing(c -> c.z)).orElseThrow(() -> new RuntimeException("there is no best"));
+    }
+
+    public Coord3d getWorst(Coord3d[] pop){
+        return Arrays.stream(pop).max(Comparator.comparing(c -> c.z)).orElseThrow(() -> new RuntimeException("there is no worst"));
     }
 
     public Coord3d differencial() {
@@ -150,7 +159,7 @@ public class Population {
         }
     }
 
-    public Coord3d generateInvidual() {
+    public Coord3d generateIndividual() {
         double x = (max - min) * rand.nextDouble() + min ;
         double y = (max - min) * rand.nextDouble() + min ;
         double z = function.calculate(new double[]{x, y});
@@ -172,8 +181,51 @@ public class Population {
         System.out.println("temp: " + temperature);
         return this.temperature <= this.fOrFinalTemp;
     }
-    public Coord3d soma(){
-        return Arrays.stream(this.population).min(Comparator.comparing(c -> c.z)).orElseThrow(() -> new RuntimeException("there is no best"));
+    public Coord3d soma(float[] individual, Coord3d king, int individualIndex){
+        Coord3d newBest = new Coord3d();
+        Coord3d bestJump = new Coord3d(individual[0], individual[1], individual[2]);
+        double[] kingParameters = {king.x, king.y, king.z} ;
+        final float[] startParams = individual.clone();
+         float[] params = individual.clone();
+        for(double t = step; t <= pathLength; t+=step) {
+            int[] prtVector = genPTRVector();
+            for(int i = 0; i < population[0].toArray().length -1 ; i++) {
+                params[i] = (float) ( startParams[i] +  ( kingParameters[i] - startParams[i]) * t * prtVector[i]);
+                if(discrete){
+                    params[i] = (int) params[i];
+                }
+            }
+            params[2] = (float) function.calculate(new double[]{params[0], params[1]});
+            newBest = new Coord3d(params[0], params[1], params[2]);
+            if(newBest.z < bestJump.z) {
+                bestJump  = newBest;
+            }
+        }
+        while(bestJump.x > max) {
+            bestJump.x = (float) (bestJump.x - (max - min));
+        }
+        while(bestJump.y > max) {
+            bestJump.y = (float) (bestJump.y - (max - min));
+        }
+        while(bestJump.x < min) {
+            bestJump.x = (float) (bestJump.x + (max - min));
+        }
+        while(bestJump.y < min) {
+            bestJump.y = (float) (bestJump.y + (max - min));
+        }
+        bestJump.z = (float) function.calculate(new double[]{bestJump.x, bestJump.y});
+        System.out.println("OLD X:" + startParams[0] +" Y:" + startParams[1] +" Z:" + startParams[2] );
+        System.out.println("New X:" + newBest.x +" Y:" + newBest.y +" Z:" + newBest.z );
+        population[individualIndex] = bestJump;
+        return bestJump;
+    }
+
+    private int[] genPTRVector() {
+        int[] prt = new int[population.length];
+        for(int i = 0; i < prt.length; i++) {
+            prt[i] = rand.nextDouble() < this.PRT ? 1 : 0;
+        }
+        return prt;
     }
 
     private boolean checkNeighbours(Coord3d x) {

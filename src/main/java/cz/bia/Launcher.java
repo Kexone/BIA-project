@@ -58,21 +58,32 @@ public class Launcher extends JFrame {
     private JSlider speedSlider;
     private Population population;
     private Thread thread;
-    private int temperatureNow;
-    private TextField temperatureNowFField;
-    private TextField temperatureAfterField;
-    private int temperatureAfter;
-    private TextField radiusCRField;
-    private int radius;
     private JLabel theBestOfBest;
     private Coord3d best;
     private boolean generateNewPopulation = true;
-    private boolean diff;
-    private JLabel radiusCRText;
-    private JLabel finalTemperatureFText;
-    private float crRadius;
-    private float fOrFinalTemp;
+
+    //annealing
+    private TextField temperatureNowField;
+    private TextField temperatureAfterField;
+    private TextField radiusField;
+    private float radius;
+    private float finalTemp;
     private float temperature;
+
+    //differencial
+    private TextField FField;
+    private TextField CRField;
+    private float cr;
+    private float f;
+    private boolean diff;
+
+    //soma
+    private TextField betaField;
+    private TextField stepField;
+    private TextField pathLengthField;
+    private TextField PRTField;
+
+
 
     public static void main(String[] args) throws Exception {
         Launcher frame = new Launcher();
@@ -107,9 +118,9 @@ public class Launcher extends JFrame {
         try {
             minRange = Float.parseFloat(rangeFromText.getText());
             maxRange = Float.parseFloat(rangeToText.getText());
-            crRadius = Float.parseFloat(radiusCRField.getText());
-            fOrFinalTemp = Float.parseFloat(temperatureNowFField.getText());
-            temperature = Float.parseFloat(temperatureAfterField.getText());
+            //crRadius = Float.parseFloat(radiusCRField.getText());
+            //fOrFinalTemp = Float.parseFloat(temperatureNowFField.getText());
+            //temperature = Float.parseFloat(temperatureAfterField.getText());
             if (Integer.parseInt(popField.getText()) > 0) {
                 popMax = Integer.parseInt(popField.getText());
                 popGenerations = Integer.parseInt(popCountField.getText());
@@ -118,8 +129,8 @@ public class Launcher extends JFrame {
             }
         } catch (Exception e) {
             popGenerations = 0;
-            crRadius = 0.5f;
-            fOrFinalTemp = 0.5f;
+            //crRadius = 0.5f;
+            //fOrFinalTemp = 0.5f;
             temperature = 0;
             System.out.println("Error NaN! " + e);
             minRange = (float) funs[functions.getSelectedIndex()].getMinRange();
@@ -190,9 +201,11 @@ public class Launcher extends JFrame {
         popCountField.setEnabled(b);
         rangeFromText.setEnabled(b);
         rangeToText.setEnabled(b);
-        radiusCRField.setEnabled(b);
-        temperatureAfterField.setEnabled(b);
-        temperatureNowFField.setEnabled(b);
+//        radiusField.setEnabled(b);
+ //       CRField.setEnabled(b);
+ //       temperatureAfterField.setEnabled(b);
+ //       FField.setEnabled(b);
+  //      temperatureNowField.setEnabled(b);
     }
 
     private void selectAlgorithm() {
@@ -209,21 +222,21 @@ public class Launcher extends JFrame {
                 best = isBest(this.best);
                 System.out.println(" X:" + best.x + " Y:" + best.y + " Z:" + best.z);
                 theBestOfBest.setText("The best is X:" + best.x + " Y:" + best.y + " Z:" + best.z);
-               // drawPoint(best);
+                // drawPoint(best);
                 break;
             case 2:             // Simulation Annealing
                 generateNewPopulation = false;
                 if(best == null) {
-                    best =  population.generateInvidual();
+                    best =  population.generateIndividual();
                     System.out.println("NEW X:" + best.x + " Y:" + best.y + " Z:" + best.z);
 
                 }
                 //isBest(this.best);
                 best = this.population.annealing(popMax, best);
-               // Coord3d annealing = this.population.annealing(popMax);
+                // Coord3d annealing = this.population.annealing(popMax);
                 System.out.println("BEST X:" + best.x + " Y:" + best.y + " Z:" + best.z);
                 theBestOfBest.setText("The best is X:" + best.x + " Y:" + best.y + " Z:" + best.z);
-            //     drawPoint(best);
+                //     drawPoint(best);
                 break;
             case 3:             // Differencial evolution
                 generateNewPopulation = false;
@@ -235,14 +248,39 @@ public class Launcher extends JFrame {
                 //best = this.population.getBest(this.population.getFor(this.discrete.isSelected(), this.getSelectedFunction()));
                 //population.getFor(this.discrete.isSelected(), this.getSelectedFunction());
                 best = isBest(best);
-               // best = this.population.getBest(this.population.getPopulation());
+                // best = this.population.getBest(this.population.getPopulation());
                 System.out.println("BEST X:" + best.x + " Y:" + best.y + " Z:" + best.z);
                 theBestOfBest.setText("The best is X:" + best.x + " Y:" + best.y + " Z:" + best.z);
 //                drawPoint(best);
                 break;
             case 4:             // SOMA
-                Coord3d soma = this.population.soma();
-                drawPoint(soma);
+                generateNewPopulation = false;
+                if(best == null) {
+                    best = population.getBest(population.getPopulation());
+                }
+                Coord3d[] pop = this.population.getPopulation();
+                Coord3d bestTmp = new Coord3d();
+                System.out.println("BEST X:" + best.x + " Y:" + best.y + " Z:" + best.z);
+                for(int i=0; i < pop.length; i++) {
+                    this.population.soma(pop[i].toArray(), best, i);
+                }
+                bestTmp = population.getBest(population.getPopulation());
+                if(bestTmp.z < best.z) {
+                    best = bestTmp;
+                }
+
+                if(0.1  >= Math.abs(population.getBest(pop).z - population.getWorst(pop).z )) {
+                    System.out.println("moc u sebe");
+
+                    try {
+                        thread.join();
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                }
+
+                theBestOfBest.setText("The best is X:" + best.x + " Y:" + best.y + " Z:" + best.z);
+                // drawPoint(soma);
                 break;
 
         }
@@ -269,7 +307,7 @@ public class Launcher extends JFrame {
     }
     private void drawPopulation(boolean diff) {
         Scatter scatter, mutation;
-      //  System.out.println("Adding scatter.");
+        //  System.out.println("Adding scatter.");
         chart = AWTChartComponentFactory.chart(Quality.Advanced, "newt");
         if(diff) {
             mutation = new Scatter(population.getMutation(), Color.RED, 4);
@@ -286,7 +324,7 @@ public class Launcher extends JFrame {
     protected void drawPoint(Coord3d point) {
         this.centerPanel.removeAll();
         invalidateCanvas();
-       // System.out.println("Adding minimum.");
+        // System.out.println("Adding minimum.");
         Coord3d[] oneM = new Coord3d[1];
         oneM[0] = point;
         Scatter minimum = new Scatter(oneM, Color.BLACK, 10.5f);
@@ -351,7 +389,7 @@ public class Launcher extends JFrame {
         drawIt = new JButton("Draw it");
         drawIt.addActionListener(e -> {
             setBoundsAlgoritmData();
-            this.population = new Population(minRange,maxRange, fOrFinalTemp, crRadius, temperature, this.discrete.isSelected(), this.getSelectedFunction());
+            this.population = new Population(minRange,maxRange, f, cr, temperature, this.discrete.isSelected(), this.getSelectedFunction());
             invalidateCanvas();
             startGeneration();
         });
@@ -360,20 +398,10 @@ public class Launcher extends JFrame {
         JLabel rangeToLabel = new JLabel("To:");
         JLabel speedLabel = new JLabel("Speed:");
         JLabel algorithmText = new JLabel("Algorithm:");
-        finalTemperatureFText = new JLabel("Final temp:");
-        JLabel temperatureNowText = new JLabel("Temperature:");
-        radiusCRText = new JLabel("Radius:");
+
         theBestOfBest = new JLabel("The best is...");
         rangeFromText = new TextField(String.valueOf(minRange));
         rangeToText = new TextField(String.valueOf(maxRange));
-        radiusCRField = new TextField(String.valueOf(radius));
-        temperatureNowFField = new TextField(String.valueOf(temperatureNow));
-        temperatureAfterField = new TextField(String.valueOf(temperatureAfter));
-        temperatureNowFField.setEnabled(false);
-        temperatureAfterField.setEnabled(false);
-        radiusCRField.setEnabled(false);
-
-
         speedSlider = new JSlider(0,3000, 1000);
         speedSlider.setMajorTickSpacing(1000);
         speedSlider.setMinorTickSpacing(100);
@@ -384,13 +412,7 @@ public class Launcher extends JFrame {
         this.northPanel.add(algorithms);
         this.northPanel.add(drawIt);
         this.northPanel.add(discrete);
-        this.northPanel.add(populationPanel);
-        this.northPanel.add(radiusCRText);
-        this.northPanel.add(radiusCRField);
-        this.northPanel.add(finalTemperatureFText);
-        this.northPanel.add(temperatureNowFField);
-        this.northPanel.add(temperatureNowText);
-        this.northPanel.add(temperatureAfterField);
+
         this.northPanel.add(Box.createRigidArea(new Dimension(65, 0)));
         this.northPanel.add(speedLabel);
         this.northPanel.add(speedSlider);
@@ -405,33 +427,24 @@ public class Launcher extends JFrame {
         //this.northPanel.add(Box.createRigidArea(new Dimension(4, 0)));
 
         this.northPanel.add(resetGraph);
+        this.northPanel.add(populationPanel);
         this.northPanel.add(theBestOfBest);
     }
 
     private void enableAdditionalFields() {
+        this.populationPanel.removeAll();
+        setPopulationPanel();
         if( algorithms.getSelectedIndex() == 2) {
-            radiusCRText.setText("Radius:");
-            finalTemperatureFText.setText("Final temp:");
-            temperatureNowFField.setEnabled(true);
-            temperatureAfterField.setEnabled(true);
-            radiusCRField.setEnabled(true);
-
+            setAnnealingPanel();
         }
         else if( algorithms.getSelectedIndex() == 3) {
-            temperatureNowFField.setEnabled(true);
-            temperatureAfterField.setEnabled(false);
-            radiusCRField.setEnabled(true);
-            radiusCRText.setText("CR:");
-            finalTemperatureFText.setText("F:");
-            temperatureNowFField.setText("0.5");
-            radiusCRField.setText("0.5");
+            setDifferencialPanel();
         }
-        else {
-            temperatureNowFField.setEnabled(false);
-            temperatureAfterField.setEnabled(false);
-            radiusCRField.setEnabled(false);
+        else  if( algorithms.getSelectedIndex() == 4){
+            setSomaPanel();
+        }
+        this.populationPanel.revalidate();
 
-        }
     }
 
     private void setPopulationPanel() {
@@ -452,7 +465,53 @@ public class Launcher extends JFrame {
         if(thread != null){
             thread.stop();
         }
+        generateNewPopulation = true;
         this.enableSettings(true);
     }
 
+
+    private void setAnnealingPanel() {
+        JLabel finalTemperatureText = new JLabel("Final temp:");
+        JLabel temperatureNowText = new JLabel("Temperature:");
+        JLabel radiusText = new JLabel("Radius:");
+        radiusField = new TextField();
+        temperatureNowField = new TextField();
+        temperatureAfterField = new TextField();
+        this.populationPanel.add(radiusText);
+        this.populationPanel.add(radiusField);
+        this.populationPanel.add(finalTemperatureText);
+        this.populationPanel.add(temperatureNowField);
+        this.populationPanel.add(temperatureNowText);
+        this.populationPanel.add(temperatureAfterField);
+    }
+
+    private void setDifferencialPanel() {
+        JLabel CRText = new JLabel("CR:");
+        JLabel FText = new JLabel("F:");
+        CRField = new TextField(String.valueOf(radius));
+        FField = new TextField();
+        this.populationPanel.add(CRText);
+        this.populationPanel.add(CRField);
+        this.populationPanel.add(FText);
+        this.populationPanel.add(FField);
+    }
+
+    private void setSomaPanel() {
+        JLabel betaText = new JLabel("Beta:");
+        JLabel stepText = new JLabel("Step:");
+        JLabel pathLengthText = new JLabel("Path Length:");
+        JLabel PRTText = new JLabel("PRT:");
+        betaField = new TextField();
+        stepField = new TextField();
+        pathLengthField = new TextField();
+        PRTField = new TextField();
+        this.populationPanel.add(betaText);
+        this.populationPanel.add(betaField);
+        this.populationPanel.add(stepText);
+        this.populationPanel.add(stepField);
+        this.populationPanel.add(pathLengthText);
+        this.populationPanel.add(pathLengthField);
+        this.populationPanel.add(PRTText);
+        this.populationPanel.add(PRTField);
+    }
 }
