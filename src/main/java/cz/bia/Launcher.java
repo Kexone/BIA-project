@@ -1,7 +1,9 @@
 package cz.bia;
 
 import javax.swing.*;
+import javax.xml.soap.Text;
 
+import cz.bia.algorithm.*;
 import cz.bia.model.IFunction;
 import cz.bia.Yao.*;
 import org.jzy3d.chart.Chart;
@@ -31,7 +33,7 @@ public class Launcher extends JFrame {
 
     String[] funsToMenu = {"1 Yao", "2 Yao", "3 Yao", "4 Yao", "5 Yao", "6 Yao", "7 Yao", "8 Yao", "9 Yao", "10 Yao", "11 Yao", "12 Yao", "13 Yao", "14 Yao NI",
             "15 Yao NI", "16 Yao", "17 Yao", "18 Yao", "19 Yao NI", "20 Yao NI", "21 Yao NI"};
-    String[] algToMenu = {"", "Blind algorithm", "Simulated annealing", "Differential evolution", "SOMA" };
+    String[] algToMenu = {"", "Blind algorithm", "Simulated annealing", "Differential evolution", "SOMA", "Evolution Strategy" };
 
     private Chart chart;
     private final JPanel northPanel;
@@ -59,9 +61,9 @@ public class Launcher extends JFrame {
     private Population population;
     private Thread thread;
     private JLabel theBestOfBest;
-    private Coord3d best;
+    public Coord3d best;
     private boolean generateNewPopulation = true;
-
+    private Algorithm alg;
     //annealing
     private TextField temperatureNowField;
     private TextField temperatureAfterField;
@@ -69,6 +71,7 @@ public class Launcher extends JFrame {
     private float radius;
     private float finalTemp;
     private float temperature;
+    private boolean isCompleted;
 
     //differencial
     private TextField FField;
@@ -82,7 +85,12 @@ public class Launcher extends JFrame {
     private TextField stepField;
     private TextField pathLengthField;
     private TextField PRTField;
+    private TextField minDivField;
+    private TextField fitnessValueField;
+    private TextField gaussDeviationField;
+    private JCheckBox typeOfMode;
 
+    //es
 
 
     public static void main(String[] args) throws Exception {
@@ -94,14 +102,11 @@ public class Launcher extends JFrame {
         this.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         this.setContentPane(new JPanel(new BorderLayout()));
         setSize(750, 600);
-        //northPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 0, 0));
         northPanel = new JPanel(new WrapLayout());
         populationPanel = new JPanel(new FlowLayout(FlowLayout.LEADING, 0, 0));
-        //secondNorthPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 0, 0));
         centerPanel = new JPanel(new BorderLayout());
         this.add(northPanel, BorderLayout.BEFORE_FIRST_LINE);
         this.add(centerPanel, BorderLayout.CENTER);
-        //this.add(secondNorthPanel, BorderLayout.PAGE_END);
         this.setPopulationPanel();
         this.setNorthPanel();
         this.setCenterPanel();
@@ -178,7 +183,7 @@ public class Launcher extends JFrame {
                         }
                     }
                     if(algorithms.getSelectedIndex() == 2) {
-                        if (population.isCompleted()) {
+                        if (isCompleted) {
                             break;
                         } else {
                             i--;
@@ -216,23 +221,30 @@ public class Launcher extends JFrame {
                 this.drawPopulation(diff);
                 break;
             case 1:             // Blind search
+                alg = new BlindSearch();
                 if(best == null) {
-                    best = this.population.getBest(this.population.getPopulation());
+                    best =  alg.start(this.population);
+                    break;
                 }
-                best = isBest(this.best);
+                if(best.z > alg.start(this.population).z) {
+                    best = alg.start(this.population);
+                }
                 System.out.println(" X:" + best.x + " Y:" + best.y + " Z:" + best.z);
                 theBestOfBest.setText("The best is X:" + best.x + " Y:" + best.y + " Z:" + best.z);
-                // drawPoint(best);
                 break;
             case 2:             // Simulation Annealing
                 generateNewPopulation = false;
+                alg = new SimulatingAnnealing(funs[functions.getSelectedIndex()], maxRange,
+                        minRange, this.discrete.isSelected(), Double.parseDouble(radiusField.getText()), Double.parseDouble(temperatureNowField.getText()),
+                        Double.parseDouble(temperatureAfterField.getText()), Double.parseDouble(betaField.getText()));
                 if(best == null) {
-                    best =  population.generateIndividual();
+                    best =  alg.generateIndividual();
                     System.out.println("NEW X:" + best.x + " Y:" + best.y + " Z:" + best.z);
-
                 }
-                //isBest(this.best);
-                best = this.population.annealing(popMax, best);
+                alg.setIndividual(best);
+                this.best = alg.start(population);
+                isCompleted = SimulatingAnnealing.isCompleted;
+                //best = this.population.annealing(popMax, best);
                 // Coord3d annealing = this.population.annealing(popMax);
                 System.out.println("BEST X:" + best.x + " Y:" + best.y + " Z:" + best.z);
                 theBestOfBest.setText("The best is X:" + best.x + " Y:" + best.y + " Z:" + best.z);
@@ -241,90 +253,74 @@ public class Launcher extends JFrame {
             case 3:             // Differencial evolution
                 generateNewPopulation = false;
                 diff = true;
-                this.population.differencial();
+                alg = new DifferentialEvolution(funs[functions.getSelectedIndex()], maxRange,
+                        minRange, this.discrete.isSelected(), Double.parseDouble(FField.getText()), Double.parseDouble(CRField.getText()));
+                alg.start(population);
+               // this.population.differencial();
                 if(best == null) {
-                    best = this.population.getBest(this.population.getMutation());
+                    best = alg.getBest(this.population.getPopulation());
+                    break;
                 }
-                //best = this.population.getBest(this.population.getFor(this.discrete.isSelected(), this.getSelectedFunction()));
-                //population.getFor(this.discrete.isSelected(), this.getSelectedFunction());
-                best = isBest(best);
-                // best = this.population.getBest(this.population.getPopulation());
+                best = alg.getBest(this.population.getPopulation());
                 System.out.println("BEST X:" + best.x + " Y:" + best.y + " Z:" + best.z);
                 theBestOfBest.setText("The best is X:" + best.x + " Y:" + best.y + " Z:" + best.z);
-//                drawPoint(best);
                 break;
             case 4:             // SOMA
                 generateNewPopulation = false;
+                alg = new SomaAllToOne(funs[functions.getSelectedIndex()], maxRange,
+                        minRange, this.discrete.isSelected(), Double.parseDouble(PRTField.getText()), Double.parseDouble(stepField.getText()),
+                        Double.parseDouble(pathLengthField.getText()), Double.parseDouble(minDivField.getText()));
                 if(best == null) {
-                    best = population.getBest(population.getPopulation());
+                    best = alg.getBest(population.getPopulation());
                 }
-                Coord3d[] pop = this.population.getPopulation();
                 Coord3d bestTmp = new Coord3d();
                 System.out.println("BEST X:" + best.x + " Y:" + best.y + " Z:" + best.z);
-                for(int i=0; i < pop.length; i++) {
-                    this.population.soma(pop[i].toArray(), best, i);
-                }
-                bestTmp = population.getBest(population.getPopulation());
-                if(bestTmp.z < best.z) {
+                alg.setIndividual(best);
+                bestTmp = alg.start(population);
+               if(bestTmp.z < best.z) {
                     best = bestTmp;
                 }
-
-                if(0.1  >= Math.abs(population.getBest(pop).z - population.getWorst(pop).z )) {
+                if(SomaAllToOne.toClose) {
                     System.out.println("moc u sebe");
-
                     try {
                         thread.join();
                     } catch (InterruptedException e) {
                         e.printStackTrace();
                     }
+                    this.resetChart();
                 }
-
                 theBestOfBest.setText("The best is X:" + best.x + " Y:" + best.y + " Z:" + best.z);
-                // drawPoint(soma);
                 break;
+            case 5:         // Evolution Strategy
+                generateNewPopulation = false;
+                alg = new EvolutionStrategy(funs[functions.getSelectedIndex()], maxRange,
+                        minRange, this.discrete.isSelected(), Double.parseDouble(fitnessValueField.getText()), Double.parseDouble(gaussDeviationField.getText()), typeOfMode.isSelected() );
+                if(best == null) {
+                    best = alg.getBest(population.getPopulation());
+                }
+                bestTmp = alg.start(population);
+                if(bestTmp.z < best.z) {
+                    best = bestTmp;
+                }
+                isCompleted = SimulatingAnnealing.isCompleted;
+                theBestOfBest.setText("The best is X:" + best.x + " Y:" + best.y + " Z:" + best.z);
+                System.out.println("BEST X:" + best.x + " Y:" + best.y + " Z:" + best.z);
 
         }
 
     }
 
-    private Coord3d isBest(Coord3d latest) {
-        Coord3d newBest;
-        if(this.population.getMutation() != null) {
-            newBest = this.population.getBest(population.getMutation());
-        }
-        else {
-            newBest = this.population.getBest(population.getPopulation());
-        }
-        System.out.println("Old best " + latest.z);
-        System.out.println("New best " + newBest.z);
-
-        if(newBest.z < latest.z) {
-            System.out.println("NEW is best");
-            return newBest;
-        }
-        System.out.println("OLD is best");
-        return latest;
-    }
     private void drawPopulation(boolean diff) {
-        Scatter scatter, mutation;
-        //  System.out.println("Adding scatter.");
+        Scatter scatter;
         chart = AWTChartComponentFactory.chart(Quality.Advanced, "newt");
-        if(diff) {
-            mutation = new Scatter(population.getMutation(), Color.RED, 4);
-            chart.getScene().add(mutation);
-            surface.add(mutation);
-        }
-        else {
             scatter = new Scatter(population.getPopulation(), Color.GREEN, 4);
             chart.getScene().add(scatter);
             surface.add(scatter);
-        }
     }
 
     protected void drawPoint(Coord3d point) {
         this.centerPanel.removeAll();
         invalidateCanvas();
-        // System.out.println("Adding minimum.");
         Coord3d[] oneM = new Coord3d[1];
         oneM[0] = point;
         Scatter minimum = new Scatter(oneM, Color.BLACK, 10.5f);
@@ -389,7 +385,7 @@ public class Launcher extends JFrame {
         drawIt = new JButton("Draw it");
         drawIt.addActionListener(e -> {
             setBoundsAlgoritmData();
-            this.population = new Population(minRange,maxRange, f, cr, temperature, this.discrete.isSelected(), this.getSelectedFunction());
+            this.population = new Population(minRange,maxRange, this.discrete.isSelected(), this.getSelectedFunction());
             invalidateCanvas();
             startGeneration();
         });
@@ -416,7 +412,6 @@ public class Launcher extends JFrame {
         this.northPanel.add(Box.createRigidArea(new Dimension(65, 0)));
         this.northPanel.add(speedLabel);
         this.northPanel.add(speedSlider);
-        //  this.northPanel.add(speedNumberLabel);
         this.northPanel.add(rangeFromLabel);
         this.northPanel.add(rangeFromText);
         this.northPanel.add(rangeToLabel);
@@ -442,6 +437,9 @@ public class Launcher extends JFrame {
         }
         else  if( algorithms.getSelectedIndex() == 4){
             setSomaPanel();
+        }
+        else if(algorithms.getSelectedIndex() == 5) {
+            setStrategyPanel();
         }
         this.populationPanel.revalidate();
 
@@ -471,12 +469,16 @@ public class Launcher extends JFrame {
 
 
     private void setAnnealingPanel() {
+        JLabel betaText = new JLabel("Beta:");
         JLabel finalTemperatureText = new JLabel("Final temp:");
         JLabel temperatureNowText = new JLabel("Temperature:");
         JLabel radiusText = new JLabel("Radius:");
+        betaField = new TextField();
         radiusField = new TextField();
         temperatureNowField = new TextField();
         temperatureAfterField = new TextField();
+        this.populationPanel.add(betaText);
+        this.populationPanel.add(betaField);
         this.populationPanel.add(radiusText);
         this.populationPanel.add(radiusField);
         this.populationPanel.add(finalTemperatureText);
@@ -497,21 +499,35 @@ public class Launcher extends JFrame {
     }
 
     private void setSomaPanel() {
-        JLabel betaText = new JLabel("Beta:");
+
         JLabel stepText = new JLabel("Step:");
         JLabel pathLengthText = new JLabel("Path Length:");
         JLabel PRTText = new JLabel("PRT:");
-        betaField = new TextField();
+        JLabel minDivText = new JLabel("MinDiv:");
         stepField = new TextField();
         pathLengthField = new TextField();
         PRTField = new TextField();
-        this.populationPanel.add(betaText);
-        this.populationPanel.add(betaField);
+        minDivField = new TextField();
         this.populationPanel.add(stepText);
         this.populationPanel.add(stepField);
         this.populationPanel.add(pathLengthText);
         this.populationPanel.add(pathLengthField);
         this.populationPanel.add(PRTText);
         this.populationPanel.add(PRTField);
+        this.populationPanel.add(minDivText);
+        this.populationPanel.add(minDivField);
+    }
+
+    private void setStrategyPanel() {
+        JLabel bestFitness = new JLabel("Best Fitness:");
+        fitnessValueField = new TextField("0.99");
+        JLabel gaussDeviation = new JLabel("Gauss deviation:");
+        gaussDeviationField = new TextField("0.5");
+        typeOfMode = new JCheckBox("ES(μ+λ)");
+        this.populationPanel.add(bestFitness);
+        this.populationPanel.add(fitnessValueField);
+        this.populationPanel.add(gaussDeviation);
+        this.populationPanel.add(gaussDeviationField);
+        this.populationPanel.add(typeOfMode);
     }
 }
