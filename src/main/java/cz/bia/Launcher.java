@@ -89,6 +89,7 @@ public class Launcher extends JFrame {
     private TextField fitnessValueField;
     private TextField gaussDeviationField;
     private JCheckBox typeOfMode;
+    private JCheckBox cpsols;
 
     //es
 
@@ -216,6 +217,7 @@ public class Launcher extends JFrame {
     private void selectAlgorithm() {
         int selectedAlg = algorithms.getSelectedIndex();
         diff = false;
+        Coord3d bestTmp;
         switch (selectedAlg) {
             case 0:             // Without algorithm
                 this.drawPopulation(diff);
@@ -226,11 +228,10 @@ public class Launcher extends JFrame {
                     best =  alg.start(this.population);
                     break;
                 }
-                if(best.z > alg.start(this.population).z) {
-                    best = alg.start(this.population);
+                bestTmp = alg.start(population);
+                if(best.z > bestTmp.z) {
+                    best = bestTmp;
                 }
-                System.out.println(" X:" + best.x + " Y:" + best.y + " Z:" + best.z);
-                theBestOfBest.setText("The best is X:" + best.x + " Y:" + best.y + " Z:" + best.z);
                 break;
             case 2:             // Simulation Annealing
                 generateNewPopulation = false;
@@ -242,13 +243,11 @@ public class Launcher extends JFrame {
                     System.out.println("NEW X:" + best.x + " Y:" + best.y + " Z:" + best.z);
                 }
                 alg.setIndividual(best);
-                this.best = alg.start(population);
+                bestTmp = alg.start(population);
+                if(best.z > bestTmp.z) {
+                    best = bestTmp;
+                }
                 isCompleted = SimulatingAnnealing.isCompleted;
-                //best = this.population.annealing(popMax, best);
-                // Coord3d annealing = this.population.annealing(popMax);
-                System.out.println("BEST X:" + best.x + " Y:" + best.y + " Z:" + best.z);
-                theBestOfBest.setText("The best is X:" + best.x + " Y:" + best.y + " Z:" + best.z);
-                //     drawPoint(best);
                 break;
             case 3:             // Differencial evolution
                 generateNewPopulation = false;
@@ -256,14 +255,11 @@ public class Launcher extends JFrame {
                 alg = new DifferentialEvolution(funs[functions.getSelectedIndex()], maxRange,
                         minRange, this.discrete.isSelected(), Double.parseDouble(FField.getText()), Double.parseDouble(CRField.getText()));
                 alg.start(population);
-               // this.population.differencial();
                 if(best == null) {
                     best = alg.getBest(this.population.getPopulation());
                     break;
                 }
                 best = alg.getBest(this.population.getPopulation());
-                System.out.println("BEST X:" + best.x + " Y:" + best.y + " Z:" + best.z);
-                theBestOfBest.setText("The best is X:" + best.x + " Y:" + best.y + " Z:" + best.z);
                 break;
             case 4:             // SOMA
                 generateNewPopulation = false;
@@ -273,11 +269,10 @@ public class Launcher extends JFrame {
                 if(best == null) {
                     best = alg.getBest(population.getPopulation());
                 }
-                Coord3d bestTmp = new Coord3d();
                 System.out.println("BEST X:" + best.x + " Y:" + best.y + " Z:" + best.z);
                 alg.setIndividual(best);
                 bestTmp = alg.start(population);
-               if(bestTmp.z < best.z) {
+                if(bestTmp.z < best.z) {
                     best = bestTmp;
                 }
                 if(SomaAllToOne.toClose) {
@@ -289,12 +284,14 @@ public class Launcher extends JFrame {
                     }
                     this.resetChart();
                 }
+                System.out.println("BEST X:" + best.x + " Y:" + best.y + " Z:" + best.z);
                 theBestOfBest.setText("The best is X:" + best.x + " Y:" + best.y + " Z:" + best.z);
                 break;
             case 5:         // Evolution Strategy
                 generateNewPopulation = false;
                 alg = new EvolutionStrategy(funs[functions.getSelectedIndex()], maxRange,
-                        minRange, this.discrete.isSelected(), Double.parseDouble(fitnessValueField.getText()), Double.parseDouble(gaussDeviationField.getText()), typeOfMode.isSelected() );
+                        minRange, this.discrete.isSelected(), Double.parseDouble(fitnessValueField.getText()),
+                        Double.parseDouble(gaussDeviationField.getText()), typeOfMode.isSelected() );
                 if(best == null) {
                     best = alg.getBest(population.getPopulation());
                 }
@@ -302,11 +299,19 @@ public class Launcher extends JFrame {
                 if(bestTmp.z < best.z) {
                     best = bestTmp;
                 }
-                isCompleted = SimulatingAnnealing.isCompleted;
-                theBestOfBest.setText("The best is X:" + best.x + " Y:" + best.y + " Z:" + best.z);
-                System.out.println("BEST X:" + best.x + " Y:" + best.y + " Z:" + best.z);
-
+                //isCompleted = SomaAllToOne.toClose;
         }
+        System.out.println("BEFORE X:" + best.x + " Y:" + best.y + " Z:" + best.z);
+        if(cpsols.isSelected()) {
+            alg = new NaiveDirectedSearch(funs[functions.getSelectedIndex()], maxRange,
+                    minRange, this.discrete.isSelected());
+            bestTmp = alg.start(population);
+            if(bestTmp.z < best.z) {
+                best = bestTmp;
+            }
+        }
+        System.out.println(" AFTER X:" + best.x + " Y:" + best.y + " Z:" + best.z);
+        theBestOfBest.setText("The best is X:" + best.x + " Y:" + best.y + " Z:" + best.z);
 
     }
 
@@ -374,6 +379,7 @@ public class Launcher extends JFrame {
         resetGraph = new JButton("R");
         resetGraph.addActionListener(e -> resetChart());
         discrete = new JCheckBox("Discrete", false);
+        cpsols = new JCheckBox("CPSOLS", false);
         functions = new JComboBox(funsToMenu);
         functions.setForeground(java.awt.Color.gray);
         functions.setFont(new Font("Arial", Font.PLAIN, 14));
@@ -408,7 +414,7 @@ public class Launcher extends JFrame {
         this.northPanel.add(algorithms);
         this.northPanel.add(drawIt);
         this.northPanel.add(discrete);
-
+        this.northPanel.add(cpsols);
         this.northPanel.add(Box.createRigidArea(new Dimension(65, 0)));
         this.northPanel.add(speedLabel);
         this.northPanel.add(speedSlider);
